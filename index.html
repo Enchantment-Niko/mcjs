@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+<meta name="description" content="由 Enchantment-Niko 制作，MCJS 高版本源头" />
+<meta name="keywords" content="WebMC, eagler, eaglercraft, eaglercraftx, minecraft, chinese, launcher" />
+<meta property="og:locale" content="zh-CN" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="WebMC - 网页版 Eaglercraft 高版本启动器" />
+<meta property="og:description" content="由 Enchantment-Niko 制作，MCJS 高版本源头" />
+<title>Eaglercraft 高版本启动器</title>
+<link rel="stylesheet" href="https://unpkg.com/mdui@2/mdui.css" />
+<script src="https://unpkg.com/mdui@2/mdui.global.js"></script>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+
+<script>
+(function redirectNonChinese() {
+    const userLang = navigator.language || navigator.userLanguage || '';
+    if (!/zh/i.test(userLang)) {
+        window.location.href = '404.html';
+    }
+})();
+</script>
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html, body {
+    min-height: 100vh;
+    height: auto;
+    scroll-behavior: smooth;
+}
+body{
+    background-image: url("background.png");
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    background-color: rgb(var(--mdui-color-surface));
+    color: rgb(var(--mdui-color-on-surface));
+    display:flex;
+    flex-direction:column;
+}
+img {
+    max-width: 100%;
+    height: auto;
+}
+.page-container {
+    max-width:920px;
+    margin:0 auto;
+    padding:2rem 1.2rem 3rem;
+    width:100%;
+    flex:1;
+}
+h1{
+    text-align:center;
+    margin-bottom:0.5rem;
+    color: #fff;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.6), 0 0 2px rgba(0,0,0,0.8);
+    font-weight: 700;
+}
+.subtitle{
+    text-align:center;
+    color: #fff;
+    text-shadow: 0 1px 6px rgba(0,0,0,0.6), 0 0 2px rgba(0,0,0,0.8);
+    margin-bottom:2rem;
+    font-weight: 500;
+}
+.section-title{
+    font-size:1.4rem;
+    font-weight:600;
+    margin:2.5rem 0 1rem;
+    padding: 0.3rem 0.9rem;
+    background: rgba(var(--mdui-color-primary-container), 0.85);
+    color: rgb(var(--mdui-color-on-primary-container));
+    border-radius: 6px;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    width: fit-content;
+    scroll-margin-top: 5rem;
+}
+.divider{
+    height:1px;
+    background-color:rgb(var(--mdui-color-outline-variant));
+    margin:2rem 0;
+}
+.card-grid{
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap:1rem;
+}
+.version-card mdui-card{
+    height:100%;
+}
+.version-card .card-body{
+    padding:1rem 1.1rem;
+}
+.version-card .tag{
+    background:rgb(var(--mdui-color-secondary-container));
+    color:rgb(var(--mdui-color-on-secondary-container));
+    padding:0.2rem 0.5rem;
+    border-radius:4px;
+    display:inline-block;
+    font-size:0.75rem;
+    margin-right:4px;
+    margin-bottom:0.5rem;
+}
+.version-card .card-summary{
+    cursor:pointer;
+    user-select:none;
+}
+.version-card .summary-top{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+}
+.version-card h2{
+    font-size:1.15rem;
+    margin-bottom:0.3rem;
+    line-height:1.3;
+}
+.version-card .lang-line{
+    font-size:0.85rem;
+    color:rgb(var(--mdui-color-on-surface-variant));
+    margin-bottom:0.5rem;
+}
+.version-card .expand-arrow{
+    flex-shrink:0;
+    font-size:1.3rem;
+    color:rgb(var(--mdui-color-on-surface-variant));
+    transition: transform 0.25s ease;
+    line-height:1;
+    font-family: 'Material Icons';
+    font-style: normal;
+    font-weight: normal;
+    font-feature-settings: 'liga';
+    -webkit-font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
+}
+.version-card.expanded .expand-arrow{
+    transform: rotate(180deg);
+}
+.version-card .card-detail{
+    max-height:0;
+    overflow:hidden;
+    transition: max-height 0.3s ease;
+}
+.version-card.expanded .card-detail{
+    max-height:400px;
+}
+.version-card .meta{
+    color:rgb(var(--mdui-color-on-surface-variant));
+    font-size:0.85rem;
+    line-height:1.5;
+    margin-bottom:0.6rem;
+}
+.version-card .prop{
+    display:flex;
+    align-items:flex-start;
+    gap:0.4rem;
+    margin:0.25rem 0;
+    font-size:0.85rem;
+}
+.version-card .footer-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:0.8rem;
+    flex-wrap:wrap;
+    gap:8px;
+}
+.version-card .footer-row span{
+    font-size:0.85rem;
+    color:rgb(var(--mdui-color-on-surface-variant));
+}
+
+.nav-bar{
+    position:sticky;
+    top:0;
+    background: rgba(var(--mdui-color-surface), 0.7);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    z-index:10;
+    border-bottom:1px solid rgba(var(--mdui-color-outline-variant), 0.3);
+}
+.nav-inner{
+    max-width:920px;
+    margin:0 auto;
+    padding:0.8rem 1.2rem;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.nav-title{
+    font-size:1.3rem;
+    font-weight:500;
+}
+.nav-links{
+    display:flex;
+    gap:4px;
+    flex-wrap: wrap;
+}
+footer{
+    padding:1.5rem 1rem;
+    text-align:center;
+    font-size:0.9rem;
+    color:rgb(var(--mdui-color-on-surface-variant));
+    background: rgba(var(--mdui-color-surface-container), 0.7);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(var(--mdui-color-outline-variant), 0.3);
+}
+footer a{
+    color:rgb(var(--mdui-color-primary));
+    text-decoration:none;
+}
+footer a:hover{
+    text-decoration:underline;
+}
+.page-container a {
+    color: rgb(var(--mdui-color-primary));
+    text-decoration: none;
+}
+.page-container a:hover {
+    text-decoration: underline;
+}
+.transparent-notice {
+    background: rgba(var(--mdui-color-surface-container), 0.7) !important;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(var(--mdui-color-outline-variant), 0.3);
+}
+code {
+    font-family: monospace;
+    background: rgba(0,0,0,0.1);
+    padding: 0.15em 0.35em;
+    border-radius: 4px;
+}
+
+.back-to-top-wrapper {
+    position: fixed;
+    right: 1.5rem;
+    bottom: 1.5rem;
+    z-index: 100;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(16px) scale(0.9);
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                visibility 0s linear 0.3s;
+    pointer-events: none;
+}
+
+.back-to-top-wrapper.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                visibility 0s linear 0s;
+    pointer-events: auto;
+}
+
+.back-to-top-wrapper mdui-fab {
+    --mdui-fab-container-color: rgba(var(--mdui-color-surface-container), 0.95);
+    --mdui-fab-icon-color: rgb(var(--mdui-color-on-surface));
+    --mdui-fab-label-color: rgb(var(--mdui-color-on-surface));
+    box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+    border-radius: 16px;
+    transition: box-shadow 0.2s ease, --mdui-fab-container-color 0.2s ease;
+}
+
+.back-to-top-wrapper mdui-fab:hover {
+    --mdui-fab-container-color: rgba(var(--mdui-color-primary-container), 0.95);
+    --mdui-fab-icon-color: rgb(var(--mdui-color-on-primary-container));
+    --mdui-fab-label-color: rgb(var(--mdui-color-on-primary-container));
+    box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+}
+
+.back-to-top-wrapper mdui-fab::part(label) {
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+@media (max-width: 640px) {
+    .back-to-top-wrapper {
+        right: 0.9rem;
+        bottom: 0.9rem;
+    }
+}
+</style>
+</head>
+<body>
+<div class="nav-bar">
+    <div class="nav-inner">
+        <div class="nav-title">Eaglercraft</div>
+        <div class="nav-links">
+            <mdui-button class="btn-var-text" id="download-btn" icon="download">下载</mdui-button>
+            <mdui-button class="btn-var-text" id="feedback-btn" icon="feedback">反馈</mdui-button>
+        </div>
+    </div>
+</div>
+
+<div class="page-container">
+    <h1>Eaglercraft</h1>
+    <div class="subtitle">中文网页版 Minecraft 高版本启动器</div>
+    <mdui-linear-progress></mdui-linear-progress>
+    
+    <mdui-card class="transparent-notice" style="padding: 1.2rem; margin-bottom: 2rem; display: flex; align-items: center; gap: 1rem;">
+        <div style="flex: 1; font-size: 0.95rem; color: rgb(var(--mdui-color-on-surface));">
+            <strong>公告：</strong> 旧仓库被 DMCA 警告删除了，请不要 Fork / Star 我的Github仓库！！！觉得加载慢？访问我们合作伙伴的镜像站：
+        </div>
+        <mdui-button class="btn-var-text" icon="link" onclick="location.href='https://mcjs.link'" target="_blank">访问 MCJS.Link</mdui-button>
+    </mdui-card>
+
+    <mdui-card class="transparent-notice" style="padding: 1.2rem; margin-bottom: 2rem; display: flex; align-items: center; gap: 1rem;">
+        <div style="flex: 1; font-size: 0.95rem; color: rgb(var(--mdui-color-on-surface));">
+            <strong>跳转：</strong><br>
+            <mdui-button class="btn-var-tonal" icon="play_arrow" onclick="location.href='#play'">游玩</mdui-button>
+            <mdui-button class="btn-var-tonal" icon="help" onclick="location.href='#faq'">FAQ</mdui-button>
+            <mdui-button class="btn-var-tonal" icon="bug_report" onclick="location.href='#bugs'">已知 Bug</mdui-button>
+            <mdui-button class="btn-var-tonal" icon="info" onclick="location.href='#about'">关于</mdui-button>
+            <mdui-button class="btn-var-tonal" icon="link" onclick="location.href='#links'">友情链接</mdui-button>
+        </div>
+    </mdui-card>
+
+    <h2 class="section-title" id="play">游玩</h2>
+    <div class="card-grid">
+        <div class="version-card">
+            <mdui-card>
+                <div class="card-body">
+                    <div class="card-summary">
+                        <div class="summary-top">
+                            <h2>Eaglercraft 26.3 WASM-GC</h2>
+                            <span class="expand-arrow">keyboard_arrow_up</span>
+                        </div>
+                        <div class="lang-line">
+                            <span class="tag">推荐</span>
+                            <span class="tag">测试版</span>
+                            语言: <strong>中文 / 英文</strong>
+                        </div>
+                    </div>
+                    <div class="card-detail">
+                        <div class="meta">
+                            构建版本: Fixed<br>
+                            开发者: Joey-JM, o_xer<br>
+                            汉化: Enchantment‑Niko, Joey-JM, o_xer
+                        </div>
+                        <div class="prop">
+                            <span>性能: 高</span>
+                        </div>
+                        <div class="prop">
+                            <span>支持设备:<br>✓ 电脑键鼠<br>✓ 移动设备</span>
+                        </div>
+                        <div class="prop">
+                            <span>多人游戏:<br>✓ Relay P2P联机<br>✓ 单人游戏<br>✕ 房间列表</span>
+                        </div>
+                        <div class="footer-row">
+                            <mdui-button class="btn-var-filled" icon="play_arrow" onclick="location.href='assets/26.3.html'">游玩</mdui-button>
+                            <span>64.9MB</span>
+                        </div>
+                    </div>
+                </div>
+            </mdui-card>
+        </div>
+        <div class="version-card">
+            <mdui-card>
+                <div class="card-body">
+                    <div class="card-summary">
+                        <div class="summary-top">
+                            <h2>Eaglercraft 1.13.2 WASM‑GC</h2>
+                            <span class="expand-arrow">keyboard_arrow_up</span>
+                        </div>
+                        <div class="lang-line">
+                            <span class="tag">推荐</span>
+                            <span class="tag">正式版</span>
+                            语言: <strong>中文</strong>
+                        </div>
+                    </div>
+                    <div class="card-detail">
+                        <div class="meta">
+                            构建版本: u1(Update 1)<br>
+                            开发者: arlen<br>
+                            汉化: Enchantment‑Niko
+                        </div>
+                        <div class="prop">
+                            <span>性能: 高</span>
+                        </div>
+                        <div class="prop">
+                            <span>支持设备:<br>✓ 电脑键鼠<br>✕ 移动设备</span>
+                        </div>
+                        <div class="prop">
+                            <span>多人游戏:<br>✓ Relay P2P联机<br>✓ 单人游戏<br>✓ 房间列表</span>
+                        </div>
+                        <div class="footer-row">
+                            <mdui-button class="btn-var-filled" icon="play_arrow" onclick="location.href='assets/1.13.2'">游玩</mdui-button>
+                            <span>38.7MB</span>
+                        </div>
+                    </div>
+                </div>
+            </mdui-card>
+        </div>
+        <div class="version-card">
+            <mdui-card>
+                <div class="card-body">
+                    <div class="card-summary">
+                        <div class="summary-top">
+                            <h2>Eaglercraft 1.14.4 WASM-GC</h2>
+                            <span class="expand-arrow">keyboard_arrow_up</span>
+                        </div>
+                        <div class="lang-line">
+                            <span class="tag">停更</span>
+                            <span class="tag">测试版</span>
+                            语言: <strong>全语言</strong>
+                        </div>
+                    </div>
+                    <div class="card-detail">
+                        <div class="meta">
+                            构建版本: u1(Update 1 Pre)<br>
+                            开发者: eymenwsmc<br>
+                            汉化: eymenwsmc
+                        </div>
+                        <div class="prop">
+                            <span>性能: 高</span>
+                        </div>
+                        <div class="prop">
+                            <span>支持设备:<br>✓ 电脑键鼠<br>✕ 移动设备</span>
+                        </div>
+                        <div class="prop">
+                            <span>多人游戏:<br>✓ Relay P2P联机<br>✓ 单人游戏<br>✕ 房间列表</span>
+                        </div>
+                        <div class="footer-row">
+                            <mdui-button class="btn-var-filled" icon="play_arrow" onclick="location.href='assets/1.14.4'">游玩</mdui-button>
+                            <span>25.7MB</span>
+                        </div>
+                    </div>
+                </div>
+            </mdui-card>
+        </div>
+        <div class="version-card">
+            <mdui-card>
+                <div class="card-body">
+                    <div class="card-summary">
+                        <div class="summary-top">
+                            <h2>Eaglercraft 1.16.5 WASM-GC</h2>
+                            <span class="expand-arrow">keyboard_arrow_up</span>
+                        </div>
+                        <div class="lang-line">
+                            <span class="tag">正式版</span>
+                            语言: <strong>中文</strong>
+                        </div>
+                    </div>
+                    <div class="card-detail">
+                        <div class="meta">
+                            构建版本: u3(Update 3)<br>
+                            开发者: Acorndev<br>
+                            汉化: Enchantment‑Niko
+                        </div>
+                        <div class="prop">
+                            <span>性能: 低</span>
+                        </div>
+                        <div class="prop">
+                            <span>支持设备:<br>✓ 电脑键鼠<br>✕ 移动设备</span>
+                        </div>
+                        <div class="prop">
+                            <span>多人游戏:<br>✓ Relay P2P联机<br>✓ 单人游戏<br>✕ 房间列表</span>
+                        </div>
+                        <div class="footer-row">
+                            <mdui-button class="btn-var-filled" icon="play_arrow" onclick="location.href='assets/1.16.5'">游玩</mdui-button>
+                            <span>44.5MB</span>
+                        </div>
+                    </div>
+                </div>
+            </mdui-card>
+        </div>
+        <div class="version-card">
+            <mdui-card>
+                <div class="card-body">
+                    <div class="card-summary">
+                        <div class="summary-top">
+                            <h2>Eaglercraft 1.20.6 WASM-GC</h2>
+                            <span class="expand-arrow">keyboard_arrow_up</span>
+                        </div>
+                        <div class="lang-line">
+                            <span class="tag">停更</span>
+                            <span class="tag">测试版</span>
+                            语言: <strong>中文</strong>
+                        </div>
+                    </div>
+                    <div class="card-detail">
+                        <div class="meta">
+                            构建版本: beta 0.1(pre-release)<br>
+                            开发者: eymenwsmc<br>
+                            汉化: Enchantment‑Niko
+                        </div>
+                        <div class="prop">
+                            <span>性能: 高</span>
+                        </div>
+                        <div class="prop">
+                            <span>支持设备:<br>✓ 电脑键鼠<br>✕ 移动设备</span>
+                        </div>
+                        <div class="prop">
+                            <span>多人游戏:<br>✓ Relay P2P联机<br>✓ 单人游戏<br>✕ 房间列表</span>
+                        </div>
+                        <div class="footer-row">
+                            <mdui-button class="btn-var-filled" icon="play_arrow" onclick="location.href='assets/1.20.6'">游玩</mdui-button>
+                            <span>54.5MB</span>
+                        </div>
+                    </div>
+                </div>
+            </mdui-card>
+        </div>
+        <div class="version-card">
+            <mdui-card>
+                <div class="card-body">
+                    <div class="card-summary">
+                        <div class="summary-top">
+                            <h2>Eaglercraft 26.2 WASM-GC</h2>
+                            <span class="expand-arrow">keyboard_arrow_up</span>
+                        </div>
+                        <div class="lang-line">
+                            <span class="tag">测试版</span>
+                            语言: <strong>中文 / 英文</strong>
+                        </div>
+                    </div>
+                    <div class="card-detail">
+                        <div class="meta">
+                            构建版本: 0.6-dev<br>
+                            开发者: o_xer<br>
+                            汉化: Enchantment‑Niko, o_xer
+                        </div>
+                        <div class="prop">
+                            <span>性能: 一般</span>
+                        </div>
+                        <div class="prop">
+                            <span>支持设备:<br>✓ 电脑键鼠<br>✓ 移动设备</span>
+                        </div>
+                        <div class="prop">
+                            <span>多人游戏:<br>✓ Relay P2P联机<br>✓ 单人游戏<br>✕ 房间列表</span>
+                        </div>
+                        <div class="footer-row">
+                            <mdui-button class="btn-var-filled" icon="play_arrow" onclick="location.href='assets/26.2.html'">游玩</mdui-button>
+                            <span>54.1MB</span>
+                        </div>
+                    </div>
+                </div>
+            </mdui-card>
+        </div>
+        <div class="version-card">
+            <mdui-card>
+                <div class="card-body">
+                    <div class="card-summary">
+                        <div class="summary-top">
+                            <h2>Minecraft PE 0.6.1 WASM-GC</h2>
+                            <span class="expand-arrow">keyboard_arrow_up</span>
+                        </div>
+                        <div class="lang-line">
+                            <span class="tag">正式版</span>
+                            语言: <strong>英文</strong>
+                        </div>
+                    </div>
+                    <div class="card-detail">
+                        <div class="meta">
+                            构建版本: 0.6.1<br>
+                            开发者: Mojang AB<br>
+                        </div>
+                        <div class="prop">
+                            <span>性能: 高</span>
+                        </div>
+                        <div class="prop">
+                            <span>支持设备:<br>✓ 电脑键鼠<br>✓ 移动设备</span>
+                        </div>
+                        <div class="prop">
+                            <span>多人游戏:<br>✕ Relay P2P联机<br>✓ 单人游戏<br>✕ 房间列表</span>
+                        </div>
+                        <div class="footer-row">
+                            <mdui-button class="btn-var-filled" icon="play_arrow" onclick="location.href='assets/0.6.1-pe.html'">游玩</mdui-button>
+                            <span>16.5MB</span>
+                        </div>
+                    </div>
+                </div>
+            </mdui-card>
+        </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <h2 class="section-title" id="faq">FAQ</h2>
+    <mdui-card style="padding:1.5rem;">
+        <h3>Q1: 存档会丢失吗？</h3>
+        <p style="margin:1rem 0;color:rgb(var(--mdui-color-on-surface-variant));line-height:1.6;">
+            A: 存档一般来讲不清除浏览器缓存 / Cookies不会丢失，但请注意定期备份您的存档文件。
+        </p>
+        <h3>Q2: 为什么有些版本不支持移动设备？</h3>
+        <p style="margin:1rem 0;color:rgb(var(--mdui-color-on-surface-variant));line-height:1.6;">
+            A: 因为原作者制作时没有为触屏适配，且适配困难
+        </p>
+        <h3>Q3: 会收集个人信息吗？</h3>
+        <p style="margin:1rem 0;color:rgb(var(--mdui-color-on-surface-variant));line-height:1.6;">
+            A: 不会。本网站是静态网站，不会收集或窃取您的个人信息。<br>
+            注：来历不明的客户端可能含有后门代码，请谨慎游玩。
+        </p>
+        <h3>Q4: 如何提交更多高版本客户端？</h3>
+        <p style="margin:1rem 0;color:rgb(var(--mdui-color-on-surface-variant));line-height:1.6;">
+            A: 您可以通过访问我们的 GitHub 仓库并创建一个 Issue 来贡献更多高版本的客户端。
+        </p>
+        <mdui-button class="btn-var-text" icon="link" onclick="location.href='https://github.com/Enchantment-Niko/webmc'" target="_blank">访问 Github 仓库</mdui-button>
+        <h3>Q5: 离线下载什么时候有中文版？</h3>
+        <p style="margin:1rem 0;color:rgb(var(--mdui-color-on-surface-variant));line-height:1.6;">
+            A: 目前只提供英文版原版下载，需要的可以自行制作，使用这个工具：<br>
+        </p>
+        <mdui-button class="btn-var-text" icon="link" onclick="location.href='https://github.com/Enchantment-Niko/webmc/releases/download/music/opts.html'" target="_blank">EaglercraftXOpts 编辑器</mdui-button>
+        </p>
+        <h3>Q6: 目前和 MCJS 的关系是什么？</h3>
+        <p style="margin:1rem 0;color:rgb(var(--mdui-color-on-surface-variant));line-height:1.6;">
+            A: MCJS 和 Enchantment-Niko 在不久前正式合作，提供了镜像站点，解决了国内用户访问 Github Pages 慢的问题。
+        </p>
+        <h3>Q7: 如何联机 / 联机卡顿？</h3>
+        <p style="margin:1rem 0;color:rgb(var(--mdui-color-on-surface-variant));line-height:1.6;">
+            A: 国外 Relay 联机节点可能访问慢，可以进入游戏添加 <code>wss://relay.mcjs.link/</code> 为主要节点。<br>
+            但请注意：联机服务完全公益，请勿滥用（由 MCJS 运营）
+        </p>
+    </mdui-card>
+
+        <div class="divider"></div>
+
+    <h2 class="section-title" id="bugs">已知 Bug</h2>
+    <mdui-card style="padding:1.5rem;">
+        <h2>来自 <a href="https://space.bilibili.com/3546891306403960" target="_blank">哔哩哔哩@Test_Player01</a> 反馈</h2><br>
+        <h3>1.13.2</h3>
+        <p style="margin:1rem 0;color:rgb(var(--mdui-color-on-surface-variant));line-height:1.6;"> 
+        创建世界时 "允许作弊" 开关失效，需要开启共享世界才能作弊<br>
+        物品模型图层混乱 / 颠倒<br>
+        箱子等不完整方块渲染错误<br>
+        本地上传的皮肤无法正常显示
+        </p>
+        <h3>1.21.11</h3>
+        <p style="margin:1rem 0;color:rgb(var(--mdui-color-on-surface-variant));line-height:1.6;"> 
+        无法保存存档<br>
+        TPS 可能永久冻结<br>
+        需要导入一个皮肤方可进入游戏，没有皮肤就单击下方按钮保存一个临时 Steve 皮肤：
+        </p>
+        <mdui-button class="btn-var-text" icon="download" onclick="location.href='https://mcjs.link/steve.png'" target="_blank" download>获取 steve.png</mdui-button>
+        <h3>1.14.4</h3>
+        <p style="margin:1rem 0;color:rgb(var(--mdui-color-on-surface-variant));line-height:1.6;"> 
+        披风渲染问题<br>
+        更改名字要重新启动游戏才生效<br>
+        本地上传的皮肤游戏无法保存<br>
+        生物群系过渡开了游戏可能会卡顿
+        </p>
+        <h3>1.16.5</h3>
+        <p style="margin:1rem 0;color:rgb(var(--mdui-color-on-surface-variant));line-height:1.6;">        
+        游戏总体亮度偏暗
+        </p>
+        <h3>1.20.6</h3>
+        <p style="margin:1rem 0;color:rgb(var(--mdui-color-on-surface-variant));line-height:1.6;">
+        自带节点可能无法使用（使用 MCJS 节点即可：<code>wss://relay.mcjs.link/</code>）
+        </p>
+        <h3>26.1.2</h3>
+        <p style="margin:1rem 0;color:rgb(var(--mdui-color-on-surface-variant));line-height:1.6;">
+        性能极差，普通电脑可能无法流畅运行，甚至可能无法进入游戏<br>
+        无法备份存档
+        </p>
+        <h3>26.2</h3>
+        <p style="margin:1rem 0;color:rgb(var(--mdui-color-on-surface-variant));line-height:1.6;">
+        不支持 Vulkan 渲染器<br>
+        联机功能以及节点设置有一点点问题（不影响正常游玩）
+        </p>
+        <h3>26.3</h3>
+        <p style="margin:1rem 0;color:rgb(var(--mdui-color-on-surface-variant));line-height:1.6;">
+        坐垫叠两层挖掉游戏会崩溃<br>
+        快速移动到未加载区块游戏会卡各种各样的 Bug<br>
+        如船开在地上的速度和开在冰上的速度一样快且无法转向和直接开到空气上都能和在冰上一样而悬空
+        </p>
+    </mdui-card>
+
+    <div class="divider"></div>
+
+    <h2 class="section-title" id="about">关于</h2>
+    <mdui-card style="padding:1.5rem;">
+        <h3>关于 Eaglercraft</h3>
+        <p style="margin:1rem 0;color:rgb(var(--mdui-color-on-surface-variant));line-height:1.6;">
+        Eaglercraft 是一个可以在浏览器直接运行的 Minecraft 网页移植项目，使用 TeaVM 和 JavaScript 技术。本页面提供多版本网页启动入口，支持多个游戏版本，支持中文。
+        </p>
+        <p style="margin-bottom:1rem;color:rgb(var(--mdui-color-on-surface-variant))">项目仅用于学习，请勿用于商业用途。</p> 
+    </mdui-card>
+
+    <div class="divider"></div>
+
+    <h2 class="section-title" id="links">友链</h2>
+    <mdui-card style="padding:1.5rem;">
+        <h3><img src="https://mcjs.link/favicon.png" alt="MCJS Logo" width="24" height="24"> MCJS</h3>
+        <p style="margin:1rem 0;color:rgb(var(--mdui-color-on-surface-variant));line-height:1.6;">
+        无需下载, 直接在浏览器里玩 MC !<br>
+        Eaglercraft 最佳简体中文翻译版<br>
+        Eaglercraft 所有版本最全整合网站
+        </p>
+        <mdui-button class="btn-var-text" icon="link" onclick="location.href='https://mcjs.link'" target="_blank">访问 MCJS.Link</mdui-button>
+    </mdui-card>
+    <mdui-card style="padding:1.5rem;">
+        <h3>广告位招租</h3>
+        <p style="margin:1rem 0;color:rgb(var(--mdui-color-on-surface-variant));line-height:1.6;">
+        投稿友链 请点击下方按钮前往 Github 联系我
+        </p>
+        <mdui-button class="btn-var-text" icon="link" onclick="location.href='https://github.com/Enchantment-Niko/webmc/issues'" target="_blank">投稿友链</mdui-button>
+    </mdui-card>
+    <mdui-card style="padding:1.5rem;">
+        <h3>Star History</h3>
+        <div style="margin:1rem 0;">
+        <a href="https://www.star-history.com/?repos=Enchantment-Niko%2Fwebmc&type=date&legend=top-left">
+            <picture>
+                <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=Enchantment-Niko/webmc&type=date&theme=dark&legend=top-left&sealed_token=oNqN2ps3sK8SvjybGenkelPIXFPh9y4Z4loRyrVTLAIqp5sE1hvwwJEQjjgArHaBbkrdXXrCRLoY2SdWqv3EAVP9iexT7SX5TdgjxKfw8E8hjrHodrCNkQ" />
+                <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=Enchantment-Niko/webmc&type=date&legend=top-left&sealed_token=oNqN2ps3sK8SvjybGenkelPIXFPh9y4Z4loRyrVTLAIqp5sE1hvwwJEQjjgArHaBbkrdXXrCRLoY2SdWqv3EAVP9iexT7SX5TdgjxKfw8E8hjrHodrCNkQ" />
+                <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=Enchantment-Niko/webmc&type=date&legend=top-left&sealed_token=oNqN2ps3sK8SvjybGenkelPIXFPh9y4Z4loRyrVTLAIqp5sE1hvwwJEQjjgArHaBbkrdXXrCRLoY2SdWqv3EAVP9iexT7SX5TdgjxKfw8E8hjrHodrCNkQ" style="width:100%; height:auto; display:block;" />
+            </picture>
+        </a>
+        </div>
+    </mdui-card>
+</div>
+
+<footer>
+    © 2026 Enchantment‑Niko
+</footer>
+
+<!-- 存放窗口窗口 div -->
+
+<div class="back-to-top-wrapper" id="back-to-top-wrapper">
+    <mdui-fab extended icon="arrow_upward" id="back-to-top" aria-label="回到顶部">回到顶部</mdui-fab>
+</div>
+
+<mdui-dialog id="feedback-dialog">
+    <span slot="headline">提示</span>
+    <span slot="description">游戏内 Bug 暂不支持反馈，仅支持汉化 / 合作 / 网站建议等反馈</span>
+    <mdui-button slot="action" variant="text" onclick="document.getElementById('feedback-dialog').open = false">取消</mdui-button>
+    <mdui-button slot="action" variant="tonal" onclick="window.open('https://github.com/Enchantment-Niko/webmc/issues','_blank');document.getElementById('feedback-dialog').open = false">前往</mdui-button>
+</mdui-dialog>
+
+<mdui-dialog id="download-dialog">
+    <span slot="headline">提示</span>
+    <span slot="description">离线下载暂且只有英文版，没有中文版</span>
+    <mdui-button slot="action" variant="text" onclick="document.getElementById('download-dialog').open = false">取消</mdui-button>
+    <mdui-button slot="action" variant="tonal" onclick="window.open('https://pan.huang1111.cn/s/E7RBlUb','_blank');document.getElementById('download-dialog').open = false">前往</mdui-button>
+</mdui-dialog>
+
+<script>
+document.addEventListener('DOMContentLoaded', ()=>{
+    const variantMap = {
+        "btn-var-text": "text",
+        "btn-var-filled": "filled",
+        "btn-var-tonal": "tonal",
+        "btn-var-outlined": "outlined",
+        "btn-var-elevated": "elevated",
+        "btn-var-filled-tonal": "filled-tonal"
+    };
+    Object.entries(variantMap).forEach(([className, variantVal])=>{
+        document.querySelectorAll(`mdui-button.${className}`).forEach(btn=>{
+            btn.variant = variantVal;
+        })
+    })
+
+    document.querySelectorAll('.version-card .card-summary').forEach(summary=>{
+        summary.addEventListener('click', ()=>{
+            const card = summary.closest('.version-card');
+            card.classList.toggle('expanded');
+        });
+    });
+
+    const feedbackBtn = document.getElementById('feedback-btn');
+    const feedbackDialog = document.getElementById('feedback-dialog');
+    feedbackBtn.addEventListener('click', ()=>{
+        feedbackDialog.open = true;
+    });
+
+    const downloadBtn = document.getElementById('download-btn');
+    const downloadDialog = document.getElementById('download-dialog');
+    downloadBtn.addEventListener('click', ()=>{
+        downloadDialog.open = true;
+    });
+
+    const wrapper = document.getElementById('back-to-top-wrapper');
+    const backToTopFab = document.getElementById('back-to-top');
+    let fabVisible = false;
+    window.addEventListener('scroll', ()=>{
+        const shouldShow = window.scrollY > 300;
+        if (shouldShow !== fabVisible) {
+            fabVisible = shouldShow;
+            if (shouldShow) {
+                wrapper.classList.add('show');
+            } else {
+                wrapper.classList.remove('show');
+            }
+        }
+    }, { passive: true });
+
+    backToTopFab.addEventListener('click', ()=>{
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+})
+</script>
+</body>
+</html>
