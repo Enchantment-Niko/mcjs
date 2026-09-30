@@ -3,12 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-<meta name="description" content="由 Enchantment-Niko 制作，MCJS 高版本源头" />
-<meta name="keywords" content="WebMC, eagler, eaglercraft, eaglercraftx, minecraft, chinese, launcher" />
-<meta property="og:locale" content="zh-CN" />
-<meta property="og:type" content="website" />
-<meta property="og:title" content="WebMC - 网页版 Eaglercraft 高版本启动器" />
-<meta property="og:description" content="由 Enchantment-Niko 制作，MCJS 高版本源头" />
+<meta name="robots" content="noindex">
 <title>Eaglercraft 高版本启动器</title>
 <link rel="stylesheet" href="mdui.css" />
 <script src="mdui.global.js"></script>
@@ -127,9 +122,15 @@ h1{
 }
 .version-card .expand-arrow{
     flex-shrink:0;
-    font-size:1.3rem;
+    width:32px;
+    height:32px;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:rgb(var(--mdui-color-surface-container-high));
     color:rgb(var(--mdui-color-on-surface-variant));
-    transition: transform 0.25s ease;
+    font-size:1.3rem;
     line-height:1;
     font-family: 'Material Icons';
     font-style: normal;
@@ -137,9 +138,15 @@ h1{
     font-feature-settings: 'liga';
     -webkit-font-feature-settings: 'liga';
     -webkit-font-smoothing: antialiased;
+    transition: transform 0.25s ease, background 0.25s ease, color 0.25s ease;
+}
+.version-card .expand-arrow:hover{
+    background:rgb(var(--mdui-color-surface-container-highest));
 }
 .version-card.expanded .expand-arrow{
     transform: rotate(180deg);
+    background:rgb(var(--mdui-color-primary-container));
+    color:rgb(var(--mdui-color-on-primary-container));
 }
 .version-card .card-detail{
     max-height:0;
@@ -719,8 +726,6 @@ code {
 <footer>
     © 2026 Enchantment‑Niko
 </footer>
-
-<!-- 存放窗口窗口 div -->
 
 <div class="back-to-top-wrapper" id="back-to-top-wrapper">
     <mdui-fab extended icon="arrow_upward" id="back-to-top" aria-label="回到顶部">回到顶部</mdui-fab>
