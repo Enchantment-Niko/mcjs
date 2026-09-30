@@ -10,9 +10,8 @@
 <meta property="og:title" content="WebMC - 网页版 Eaglercraft 高版本启动器" />
 <meta property="og:description" content="由 Enchantment-Niko 制作，MCJS 高版本源头" />
 <title>Eaglercraft 高版本启动器</title>
-<link rel="stylesheet" href="https://unpkg.com/mdui@2/mdui.css" />
-<script src="https://unpkg.com/mdui@2/mdui.global.js"></script>
-<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+<link rel="stylesheet" href="mdui.css" />
+<script src="mdui.global.js"></script>
 
 <script>
 (function redirectNonChinese() {
@@ -284,6 +283,27 @@ code {
 .back-to-top-wrapper mdui-fab::part(label) {
     font-size: 0.9rem;
     font-weight: 500;
+}
+
+.material-icons {
+  font-family: 'Material Icons';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+}
+
+@font-face {
+  font-family: 'Material Icons';
+  font-style: normal;
+  font-weight: 400;
+  src: url(md3.woff2) format('truetype');
 }
 
 @media (max-width: 640px) {
