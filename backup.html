@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="mdui-theme-auto">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, shrink-to-fit=no">
+  <meta name="renderer" content="webkit">
+  <title>Eaglercraft IndexedDB 备份器</title>
+  <link rel="stylesheet" href="./mdui.css">
+  <script src="./mdui.global.js"></script>
+  <script src="./jszip.min.js"></script>
+  <style>
+    @font-face {
+      font-family: 'Material Icons';
+      font-style: normal;
+      font-weight: 400;
+      src: url('./md3.woff2') format('woff2');
+    }
+    :not(:defined) { visibility: hidden; }
+    body {
+      margin: 0;
+      padding: 20px 0 60px;
+      background: rgb(var(--mdui-color-background));
+      color: rgb(var(--mdui-color-on-background));
+      font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    }
+    .container { max-width: 900px; margin: 0 auto; padding: 0 16px; }
+    mdui-card { display: block; margin-bottom: 16px; }
+    .card-pad { padding: 20px; }
+    .db-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 4px;
+      border-bottom: 1px solid rgb(var(--mdui-color-outline-variant));
+    }
+    .db-item:last-child { border-bottom: none; }
+    .db-item .db-name {
+      flex: 1; font-family: monospace; font-size: 12.5px;
+      word-break: break-all;
+    }
+    .db-item .db-size {
+      font-family: monospace; font-size: 11.5px;
+      color: rgb(var(--mdui-color-on-surface-variant));
+      white-space: nowrap;
+    }
+    .db-item .db-actions { display: flex; gap: 4px; flex-wrap: wrap; }
+    .toolbar {
+      display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+      margin-bottom: 12px;
+    }
+    .toolbar .spacer { flex: 1; }
+    .selected-count {
+      font-size: 12.5px;
+      color: rgb(var(--mdui-color-on-surface-variant));
+    }
+    .summary-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid rgb(var(--mdui-color-outline-variant));
+      font-family: monospace; font-size: 13px;
+    }
+    .summary-item:last-child { border-bottom: none; }
+    .summary-item .store-name { color: rgb(var(--mdui-color-primary)); }
+    .summary-item .store-count { color: rgb(var(--mdui-color-on-surface-variant)); }
+    .loading-mask {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.45);
+      z-index: 9000;
+      align-items: center; justify-content: center;
+      flex-direction: column; gap: 16px;
+    }
+    .loading-mask .loading-text {
+      color: #fff; font-size: 14px;
+      text-shadow: 0 1px 3px rgba(0,0,0,.5);
+    }
+    .action-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
+    .progress-text {
+      font-family: monospace; font-size: 12px;
+      color: rgb(var(--mdui-color-on-surface-variant));
+      margin-top: 8px;
+    }
+    .rename-body { padding: 8px 0 4px; }
+    .warn-body { padding: 4px 0; }
+    .warn-text {
+      font-size: 13px;
+      line-height: 1.75;
+      color: rgb(var(--mdui-color-on-surface));
+      white-space: pre-line;
+    }
+    .warn-check {
+      margin-top: 12px;
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12.5px;
+      color: rgb(var(--mdui-color-on-surface-variant));
+    }
+    .log-area {
+      background: rgb(var(--mdui-color-surface-container-high));
+      border-radius: 6px;
+      padding: 10px;
+      font-family: monospace;
+      font-size: 11.5px;
+      line-height: 1.65;
+      max-height: 240px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .log-area .log-err { color: rgb(var(--mdui-color-error)); }
+    .log-area .log-ok { color: rgb(var(--mdui-color-primary)); }
+    .log-area .log-warn { color: rgb(var(--mdui-color-tertiary)); }
+    .log-area .log-info { color: rgb(var(--mdui-color-on-surface-variant)); }
+  </style>
+</head>
+<body>
+<div class="container">
+  <mdui-card>
+    <div class="card-pad mdui-prose">
+      <h2>Eaglercraft IndexedDB 备份器</h2>
+      <p>管理当前域名下的 IndexedDB 数据库：查看、重命名、删除、批量操作、导出/导入备份。</p>
+      <p>点击 “刷新列表” 查看数据库列表，由 Github@Enchantment-Niko 开发</p>
+    </div>
+  </mdui-card>
+  <mdui-card>
+    <div class="card-pad">
+      <div class="mdui-prose"><h3>数据库列表</h3></div>
+      <div class="toolbar">
+        <mdui-button id="btnRefresh" variant="filled">
+          <mdui-icon slot="icon" name="refresh"></mdui-icon>
+          刷新列表
+        </mdui-button>
+        <mdui-button id="btnSelectAll" variant="text">全选</mdui-button>
+        <mdui-button id="btnSelectNone" variant="text">取消全选</mdui-button>
+        <div class="spacer"></div>
+        <span class="selected-count" id="selectedCount"></span>
+      </div>
+      <div class="toolbar">
+        <mdui-button id="btnBatchDelete" variant="filled" disabled
+                     style="background:rgb(var(--mdui-color-error));color:rgb(var(--mdui-color-on-error));">
+          <mdui-icon slot="icon" name="delete"></mdui-icon>
+          删除选中
+        </mdui-button>
+        <mdui-button id="btnBatchExport" variant="tonal" disabled>
+          <mdui-icon slot="icon" name="download"></mdui-icon>
+          批量导出
+        </mdui-button>
+        <mdui-button id="btnImportTriggerTop" variant="outlined">
+          <mdui-icon slot="icon" name="upload"></mdui-icon>
+          导入 ZIP
+        </mdui-button>
+      </div>
+      <div id="dbListContainer" style="margin-top: 12px;"></div>
+    </div>
+  </mdui-card>
+  <mdui-card id="inspectCard" style="display: none;">
+    <div class="card-pad">
+      <div class="mdui-prose"><h3>数据库详情：<span id="inspectName" style="font-family:monospace;"></span></h3></div>
+      <div id="storeSummary" style="margin-top: 12px;"></div>
+      <mdui-divider style="margin: 16px 0;"></mdui-divider>
+      <div class="action-row">
+        <mdui-button id="btnExport" variant="filled">
+          <mdui-icon slot="icon" name="download"></mdui-icon>
+          导出为 ZIP 备份
+        </mdui-button>
+        <mdui-button id="btnImportTrigger" variant="tonal">
+          <mdui-icon slot="icon" name="upload"></mdui-icon>
+          从 ZIP 恢复
+        </mdui-button>
+        <input type="file" id="fileInput" accept=".zip" style="display: none;">
+      </div>
+      <div class="progress-text" id="detailProgress"></div>
+    </div>
+  </mdui-card>
+  <mdui-card id="statusCard" style="display: none;">
+    <div class="card-pad">
+      <div class="mdui-prose"><h4>状态</h4></div>
+      <div id="statusBox" class="mdui-prose"></div>
+      <mdui-divider style="margin: 12px 0;"></mdui-divider>
+      <div class="action-row">
+        <mdui-button id="btnResetWarnings" variant="text">
+          <mdui-icon slot="icon" name="restart_alt"></mdui-icon>
+          恢复所有警告提示
+        </mdui-button>
+      </div>
+    </div>
+  </mdui-card>
+  <mdui-card id="logCard" style="display: none;">
+    <div class="card-pad">
+      <div class="mdui-prose"><h4>操作日志</h4></div>
+      <div class="log-area" id="logArea"></div>
+      <div class="action-row" style="margin-top: 12px;">
+        <mdui-button id="btnCopyLog" variant="text">
+          <mdui-icon slot="icon" name="content_copy"></mdui-icon>
+          复制日志
+        </mdui-button>
+        <mdui-button id="btnExportLog" variant="text">
+          <mdui-icon slot="icon" name="download"></mdui-icon>
+          导出日志
+        </mdui-button>
+        <mdui-button id="btnClearLog" variant="text">
+          <mdui-icon slot="icon" name="delete_sweep"></mdui-icon>
+          清空日志
+        </mdui-button>
+      </div>
+    </div>
+  </mdui-card>
+</div>
+<div id="loadingMask" class="loading-mask" style="display: none;">
+  <mdui-circular-progress></mdui-circular-progress>
+  <div class="loading-text" id="loadingText">处理中...</div>
+</div>
+<mdui-dialog id="envWarnDialog" headline="存储环境警告">
+  <div class="warn-body">
+    <div class="warn-text" id="envWarnText"></div>
+  </div>
+  <mdui-button slot="action" variant="filled" id="envWarnOk">我知道了</mdui-button>
+</mdui-dialog>
+<mdui-dialog id="renameWarnDialog" headline="重命名前请阅读">
+  <div class="warn-body">
+    <div class="warn-text" id="renameWarnText"></div>
+    <label class="warn-check">
+      <mdui-checkbox id="renameWarnNoShow"></mdui-checkbox>
+      不再显示此警告
+    </label>
+  </div>
+  <mdui-button slot="action" variant="text" id="renameWarnCancel">取消</mdui-button>
+  <mdui-button slot="action" variant="filled" id="renameWarnOk">我已知晓</mdui-button>
+</mdui-dialog>
+<mdui-dialog id="renameDialog" headline="重命名数据库">
+  <div class="rename-body">
+    <mdui-text-field id="renameInput" label="新数据库名称"
+                     placeholder="输入新的库名" clearable></mdui-text-field>
+    <div class="warn-text" style="margin-top:10px;font-size:12.5px;color:rgb(var(--mdui-color-on-surface-variant));">
+      重命名通过“复制到新库 + 删除旧库”实现，大库会耗时较长。
+      中途关闭页面可能导致旧库未删除，需要手动清理。
+    </div>
+  </div>
+  <mdui-button slot="action" variant="text" id="renameCancel">取消</mdui-button>
+  <mdui-button slot="action" variant="filled" id="renameConfirm">开始重命名</mdui-button>
+</mdui-dialog>
+<mdui-dialog id="exportWarnDialog" headline="导出前请阅读">
+  <div class="warn-body">
+    <div class="warn-text" id="exportWarnText"></div>
+    <label class="warn-check">
+      <mdui-checkbox id="exportWarnNoShow"></mdui-checkbox>
+      不再显示此警告
+    </label>
+  </div>
+  <mdui-button slot="action" variant="text" id="exportWarnCancel">取消</mdui-button>
+  <mdui-button slot="action" variant="filled" id="exportWarnOk">开始导出</mdui-button>
+</mdui-dialog>
+<mdui-dialog id="batchExportWarnDialog" headline="批量导出前请阅读">
+  <div class="warn-body">
+    <div class="warn-text" id="batchExportWarnText"></div>
+    <label class="warn-check">
+      <mdui-checkbox id="batchExportWarnNoShow"></mdui-checkbox>
+      不再显示此警告
+    </label>
+  </div>
+  <mdui-button slot="action" variant="text" id="batchExportWarnCancel">取消</mdui-button>
+  <mdui-button slot="action" variant="filled" id="batchExportWarnOk">开始导出</mdui-button>
+</mdui-dialog>
+<mdui-dialog id="batchDeleteWarnDialog" headline="批量删除前请阅读">
+  <div class="warn-body">
+    <div class="warn-text" id="batchDeleteWarnText"></div>
+    <label class="warn-check">
+      <mdui-checkbox id="batchDeleteWarnNoShow"></mdui-checkbox>
+      不再显示此警告
+    </label>
+  </div>
+  <mdui-button slot="action" variant="text" id="batchDeleteWarnCancel">取消</mdui-button>
+  <mdui-button slot="action" variant="filled" id="batchDeleteWarnOk"
+               style="background:rgb(var(--mdui-color-error));color:rgb(var(--mdui-color-on-error));">
+    全部删除
+  </mdui-button>
+</mdui-dialog>
+<mdui-dialog id="deleteConfirmDialog" headline="确认删除">
+  <div class="warn-body">
+    <div class="warn-text" id="deleteConfirmText"></div>
+  </div>
+  <mdui-button slot="action" variant="text" id="deleteConfirmCancel">取消</mdui-button>
+  <mdui-button slot="action" variant="filled" id="deleteConfirmOk"
+               style="background:rgb(var(--mdui-color-error));color:rgb(var(--mdui-color-on-error));">
+    删除
+  </mdui-button>
+</mdui-dialog>
+<mdui-dialog id="importTargetDialog" headline="导入配置">
+  <div class="rename-body">
+    <div class="warn-text" id="importInfoText" style="margin-bottom:12px;"></div>
+    <mdui-text-field id="importTargetInput" label="目标数据库名称"
+                     placeholder="输入目标库名" clearable></mdui-text-field>
+    <label class="warn-check">
+      <mdui-checkbox id="importClearExisting"></mdui-checkbox>
+      导入前清空目标库中同名对象存储的现有数据
+    </label>
+    <div class="warn-text" style="margin-top:10px;font-size:12.5px;color:rgb(var(--mdui-color-on-surface-variant));">
+      如果目标库不存在，会自动创建。如果目标库已存在且未勾选清空，备份中的记录会覆盖同名 key，但保留其他旧记录。
+    </div>
+  </div>
+  <mdui-button slot="action" variant="text" id="importTargetCancel">取消</mdui-button>
+  <mdui-button slot="action" variant="filled" id="importTargetOk">开始导入</mdui-button>
+</mdui-dialog>
+<script>
+(function() {
+  'use strict';
+  var LS_RENAME_WARN = 'idb_backup_skip_rename_warn';
+  var LS_EXPORT_WARN = 'idb_backup_skip_export_warn';
+  var LS_BATCH_EXPORT_WARN = 'idb_backup_skip_batch_export_warn';
+  var LS_BATCH_DELETE_WARN = 'idb_backup_skip_batch_delete_warn';
+  function lsGet(k) { try { return localStorage.getItem(k) === '1'; } catch (e) { return false; } }
+  function lsSet(k) { try { localStorage.setItem(k, '1'); } catch (e) {} }
+  var allDbs = [];
+  var selected = new Set();
+  var currentDb = null;
+  var pendingRenameOld = null;
+  var pendingDeleteName = null;
+  var pendingExportName = null;
+  var pendingImportZip = null;
+  var pendingImportMeta = null;
+  var logLines = [];
+  var btnRefresh = document.getElementById('btnRefresh');
+  var btnSelectAll = document.getElementById('btnSelectAll');
+  var btnSelectNone = document.getElementById('btnSelectNone');
+  var btnBatchDelete = document.getElementById('btnBatchDelete');
+  var btnBatchExport = document.getElementById('btnBatchExport');
+  var btnImportTriggerTop = document.getElementById('btnImportTriggerTop');
+  var dbListContainer = document.getElementById('dbListContainer');
+  var selectedCount = document.getElementById('selectedCount');
+  var inspectCard = document.getElementById('inspectCard');
+  var inspectName = document.getElementById('inspectName');
+  var storeSummary = document.getElementById('storeSummary');
+  var detailProgress = document.getElementById('detailProgress');
+  var btnExport = document.getElementById('btnExport');
+  var btnImportTrigger = document.getElementById('btnImportTrigger');
+  var fileInput = document.getElementById('fileInput');
+  var statusCard = document.getElementById('statusCard');
+  var statusBox = document.getElementById('statusBox');
+  var loadingMask = document.getElementById('loadingMask');
+  var loadingText = document.getElementById('loadingText');
+  var logCard = document.getElementById('logCard');
+  var logArea = document.getElementById('logArea');
+  var btnCopyLog = document.getElementById('btnCopyLog');
+  var btnExportLog = document.getElementById('btnExportLog');
+  var btnClearLog = document.getElementById('btnClearLog');
+  var btnResetWarnings = document.getElementById('btnResetWarnings');
+  var envWarnDialog = document.getElementById('envWarnDialog');
+  var envWarnText = document.getElementById('envWarnText');
+  var envWarnOk = document.getElementById('envWarnOk');
+  var renameWarnDialog = document.getElementById('renameWarnDialog');
+  var renameWarnText = document.getElementById('renameWarnText');
+  var renameWarnNoShow = document.getElementById('renameWarnNoShow');
+  var renameWarnCancel = document.getElementById('renameWarnCancel');
+  var renameWarnOk = document.getElementById('renameWarnOk');
+  var renameDialog = document.getElementById('renameDialog');
+  var renameInput = document.getElementById('renameInput');
+  var renameCancel = document.getElementById('renameCancel');
+  var renameConfirm = document.getElementById('renameConfirm');
+  var exportWarnDialog = document.getElementById('exportWarnDialog');
+  var exportWarnText = document.getElementById('exportWarnText');
+  var exportWarnNoShow = document.getElementById('exportWarnNoShow');
+  var exportWarnCancel = document.getElementById('exportWarnCancel');
+  var exportWarnOk = document.getElementById('exportWarnOk');
+  var batchExportWarnDialog = document.getElementById('batchExportWarnDialog');
+  var batchExportWarnText = document.getElementById('batchExportWarnText');
+  var batchExportWarnNoShow = document.getElementById('batchExportWarnNoShow');
+  var batchExportWarnCancel = document.getElementById('batchExportWarnCancel');
+  var batchExportWarnOk = document.getElementById('batchExportWarnOk');
+  var batchDeleteWarnDialog = document.getElementById('batchDeleteWarnDialog');
+  var batchDeleteWarnText = document.getElementById('batchDeleteWarnText');
+  var batchDeleteWarnNoShow = document.getElementById('batchDeleteWarnNoShow');
+  var batchDeleteWarnCancel = document.getElementById('batchDeleteWarnCancel');
+  var batchDeleteWarnOk = document.getElementById('batchDeleteWarnOk');
+  var deleteConfirmDialog = document.getElementById('deleteConfirmDialog');
+  var deleteConfirmText = document.getElementById('deleteConfirmText');
+  var deleteConfirmCancel = document.getElementById('deleteConfirmCancel');
+  var deleteConfirmOk = document.getElementById('deleteConfirmOk');
+  var importTargetDialog = document.getElementById('importTargetDialog');
+  var importInfoText = document.getElementById('importInfoText');
+  var importTargetInput = document.getElementById('importTargetInput');
+  var importClearExisting = document.getElementById('importClearExisting');
+  var importTargetCancel = document.getElementById('importTargetCancel');
+  var importTargetOk = document.getElementById('importTargetOk');
+  function showLoading(text) {
+    loadingText.textContent = text || '处理中...';
+    loadingMask.style.display = 'flex';
+  }
+  function hideLoading() { loadingMask.style.display = 'none'; }
+  function setStatus(msg, type) {
+    statusCard.style.display = 'block';
+    var colorVar = type === 'error' ? '--mdui-color-error'
+                 : type === 'success' ? '--mdui-color-primary'
+                 : type === 'warn' ? '--mdui-color-tertiary'
+                 : '--mdui-color-on-surface';
+    statusBox.innerHTML = '<p style="color: rgb(var(' + colorVar + '))">' + msg + '</p>';
+  }
+  function toast(msg) { mdui.snackbar({ message: msg }); }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function(c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function formatBytes(n) {
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+    if (n < 1024 * 1024 * 1024) return (n / 1024 / 1024).toFixed(2) + ' MB';
+    return (n / 1024 / 1024 / 1024).toFixed(2) + ' GB';
+  }
+  function log(msg, type) {
+    logCard.style.display = 'block';
+    var time = new Date().toLocaleTimeString();
+    var cls = type === 'error' ? 'log-err'
+            : type === 'success' ? 'log-ok'
+            : type === 'warn' ? 'log-warn'
+            : 'log-info';
+    var line = '[' + time + '] ' + msg;
+    logLines.push({ text: line, type: cls });
+    var span = document.createElement('span');
+    span.className = cls;
+    span.textContent = line + '\n';
+    logArea.appendChild(span);
+    logArea.scrollTop = logArea.scrollHeight;
+    if (type === 'error') console.error('[IDB-Backup]', msg);
+    else if (type === 'warn') console.warn('[IDB-Backup]', msg);
+    else console.log('[IDB-Backup]', msg);
+  }
+  function renderLog() {
+    logArea.innerHTML = '';
+    logLines.forEach(function(l) {
+      var span = document.createElement('span');
+      span.className = l.type;
+      span.textContent = l.text + '\n';
+      logArea.appendChild(span);
+    });
+  }
+  function listDatabases() {
+    if (typeof indexedDB.databases !== 'function') return Promise.resolve(null);
+    return indexedDB.databases().then(function(list) {
+      return list.map(function(d) { return d.name; }).filter(Boolean);
+    }).catch(function() { return null; });
+  }
+  function openExistingDB(name) {
+    return new Promise(function(resolve, reject) {
+      var req = indexedDB.open(name);
+      var createdNew = false;
+      req.onupgradeneeded = function(e) {
+        createdNew = true;
+        try { e.target.transaction.abort(); } catch (err) {}
+      };
+      req.onsuccess = function(e) {
+        var db = e.target.result;
+        if (createdNew) {
+          db.close();
+          try { indexedDB.deleteDatabase(name); } catch (err) {}
+          reject(new Error('数据库不存在：' + name));
+          return;
+        }
+        resolve(db);
+      };
+      req.onerror = function(e) { reject(e.target.error || new Error('打开数据库失败')); };
+      req.onblocked = function() { reject(new Error('数据库被阻塞，请关闭游戏页面后重试')); };
+    });
+  }
+  function openOrCreateDB(name, stores) {
+    return new Promise(function(resolve, reject) {
+      var req = indexedDB.open(name);
+      var created = false;
+      req.onupgradeneeded = function(e) {
+        created = true;
+        var db = e.target.result;
+        stores.forEach(function(s) {
+          if (!db.objectStoreNames.contains(s.name)) {
+            db.createObjectStore(s.name, {
+              keyPath: s.keyPath || undefined,
+              autoIncrement: !!s.autoIncrement
+            });
+          }
+        });
+      };
+      req.onsuccess = function(e) { resolve({ db: e.target.result, created: created }); };
+      req.onerror = function(e) { reject(e.target.error); };
+      req.onblocked = function() { reject(new Error('数据库被阻塞，请关闭游戏页面后重试')); };
+    });
+  }
+  function deleteDatabase(name) {
+    return new Promise(function(resolve, reject) {
+      var req = indexedDB.deleteDatabase(name);
+      req.onsuccess = function() { resolve(); };
+      req.onerror = function(e) { reject(e.target.error); };
+      req.onblocked = function() { reject(new Error('删除被阻塞，请关闭游戏页面后重试')); };
+    });
+  }
+  function getAllKeys(db, storeName) {
+    return new Promise(function(resolve, reject) {
+      var tx = db.transaction(storeName, 'readonly');
+      var req = tx.objectStore(storeName).getAllKeys();
+      req.onsuccess = function() { resolve(req.result); };
+      req.onerror = function() { reject(req.error); };
+    });
+  }
+  function getAllValues(db, storeName) {
+    return new Promise(function(resolve, reject) {
+      var tx = db.transaction(storeName, 'readonly');
+      var req = tx.objectStore(storeName).getAll();
+      req.onsuccess = function() { resolve(req.result); };
+      req.onerror = function() { reject(req.error); };
+    });
+  }
+  function checkEnvironment() {
+    var checks = [];
+    var quotaPromise = (navigator.storage && navigator.storage.estimate)
+      ? navigator.storage.estimate().then(function(est) {
+          var quotaGB = (est.quota || 0) / (1024 * 1024 * 1024);
+          if (quotaGB < 0.5) {
+            return { level: 'danger', msg: '存储配额异常低（' + quotaGB.toFixed(2) + ' GB），数据可能无法持久化保存。' };
+          }
+          if (quotaGB < 2) {
+            return { level: 'warn', msg: '存储配额较低（' + quotaGB.toFixed(2) + ' GB），建议导出备份后再操作。' };
+          }
+          return { level: 'ok', msg: '存储配额正常（' + quotaGB.toFixed(1) + ' GB）。' };
+        }).catch(function(err) {
+          return { level: 'warn', msg: '无法获取存储配额信息：' + err.message };
+        })
+      : Promise.resolve({ level: 'warn', msg: '浏览器不支持存储配额检测。' });
+    checks.push(quotaPromise);
+    var persistedPromise = (navigator.storage && navigator.storage.persisted)
+      ? navigator.storage.persisted().then(function(isPersisted) {
+          if (isPersisted) {
+            return { level: 'ok', msg: '当前源已标记为持久存储，数据不易被清除。' };
+          }
+          return { level: 'info', msg: '当前源未标记为持久存储（这是常见状态，配合定期导出备份即可）。' };
+        }).catch(function() {
+          return { level: 'info', msg: '无法查询持久存储状态（不影响使用）。' };
+        })
+      : Promise.resolve({ level: 'info', msg: '浏览器不支持持久存储查询（不影响使用）。' });
+    checks.push(persistedPromise);
+    if (navigator.storage && navigator.storage.getDirectory) {
+      checks.push(
+        navigator.storage.getDirectory().then(function() {
+          return { level: 'info', msg: 'OPFS 可访问。' };
+        }).catch(function(err) {
+          var name = err && err.name ? err.name : '未知错误';
+          if (name === 'SecurityError' || name === 'NotAllowedError') {
+            return { level: 'info', msg: 'OPFS 不可用（' + name + '，可能是 file:// 或跨域场景，不影响 IndexedDB）。' };
+          }
+          return { level: 'info', msg: 'OPFS 返回 ' + name + '（不影响使用）。' };
+        })
+      );
+    }
+    return Promise.all(checks).then(function(results) {
+      var quotaResult = results[0];
+      var hasDanger = quotaResult.level === 'danger';
+      var quotaTight = quotaResult.level === 'danger' || quotaResult.level === 'warn';
+      if (quotaTight) {
+        results.forEach(function(r) {
+          log(r.msg, r.level === 'danger' ? 'error' : (r.level === 'warn' ? 'warn' : 'info'));
+        });
+      } else {
+        log(quotaResult.msg, 'info');
+      }
+      if (hasDanger) {
+        envWarnText.textContent =
+          '存储环境检测未通过。\n\n' +
+          '· ' + quotaResult.msg + '\n' +
+          '\n\n数据可能无法持久化保存，请先导出备份。';
+        envWarnDialog.open = true;
+        log('环境检测：存储配额异常，操作已阻止', 'error');
+        return false;
+      }
+      log('环境检测通过', 'success');
+      return true;
+    });
+  }
+  envWarnOk.addEventListener('click', function() { envWarnDialog.open = false; });
+  btnRefresh.addEventListener('click', function() { refreshList(); });
+  function refreshList() {
+    showLoading('正在读取数据库列表...');
+    dbListContainer.innerHTML = '';
+    inspectCard.style.display = 'none';
+    currentDb = null;
+    selected.clear();
+    updateSelectionUI();
+    listDatabases().then(function(names) {
+      if (names === null) {
+        setStatus('当前浏览器不支持自动列出数据库，无法批量管理。', 'warn');
+        log('浏览器不支持 indexedDB.databases()', 'warn');
+        return;
+      }
+      if (names.length === 0) {
+        setStatus('当前域名下没有 IndexedDB 数据库。可用「导入 ZIP」从备份恢复。', 'warn');
+        log('未找到任何数据库，可用导入功能恢复备份', 'warn');
+        return;
+      }
+      log('开始读取数据库列表，共 ' + names.length + ' 个', 'info');
+      var loaded = 0;
+      var rows = [];
+      return Promise.all(names.map(function(name) {
+        return openExistingDB(name).then(function(db) {
+          var stores = Array.from(db.objectStoreNames);
+          var totalRecords = 0;
+          return Promise.all(stores.map(function(s) {
+            return getAllKeys(db, s).then(function(k) { totalRecords += k.length; });
+          })).then(function() {
+            db.close();
+            rows.push({ name: name, stores: stores.length, records: totalRecords });
+          });
+        }).catch(function(err) {
+          rows.push({ name: name, stores: -1, records: -1, error: err.message });
+          log('读取 ' + name + ' 失败：' + err.message, 'error');
+        }).then(function() {
+          loaded++;
+          loadingText.textContent = '正在读取数据库 (' + loaded + '/' + names.length + ')...';
+        });
+      })).then(function() {
+        rows.sort(function(a, b) { return a.name.localeCompare(b.name); });
+        allDbs = rows;
+        renderList(rows);
+        setStatus('共 ' + rows.length + ' 个数据库。', 'success');
+        log('列表加载完成，共 ' + rows.length + ' 个数据库', 'success');
+      });
+    }).catch(function(err) {
+      setStatus('读取列表失败: ' + err.message, 'error');
+      log('读取列表失败：' + err.message, 'error');
+    }).then(function() {
+      hideLoading();
+    });
+  }
+  function renderList(rows) {
+    dbListContainer.innerHTML = '';
+    rows.forEach(function(row) {
+      var item = document.createElement('div');
+      item.className = 'db-item';
+      var cb = document.createElement('mdui-checkbox');
+      cb.checked = selected.has(row.name);
+      cb.addEventListener('change', function() {
+        if (cb.checked) selected.add(row.name);
+        else selected.delete(row.name);
+        updateSelectionUI();
+      });
+      item.appendChild(cb);
+      var nameEl = document.createElement('span');
+      nameEl.className = 'db-name';
+      nameEl.textContent = row.name.toLowerCase();
+      nameEl.title = row.name;
+      item.appendChild(nameEl);
+      var sizeEl = document.createElement('span');
+      sizeEl.className = 'db-size';
+      sizeEl.textContent = row.stores < 0
+        ? '读取失败'
+        : row.stores + ' 存储 / ' + row.records + ' 记录';
+      item.appendChild(sizeEl);
+      var actions = document.createElement('div');
+      actions.className = 'db-actions';
+      var openBtn = document.createElement('mdui-button');
+      openBtn.setAttribute('variant', 'text');
+      openBtn.textContent = '详情';
+      openBtn.addEventListener('click', function() { showDetail(row.name); });
+      actions.appendChild(openBtn);
+      var expBtn = document.createElement('mdui-button');
+      expBtn.setAttribute('variant', 'text');
+      expBtn.textContent = '导出';
+      expBtn.addEventListener('click', function() {
+        if (lsGet(LS_EXPORT_WARN)) {
+          checkEnvironment().then(function(ok) {
+            if (ok) doExport(row.name);
+          });
+          return;
+        }
+        pendingExportName = row.name;
+        exportWarnText.textContent =
+          '即将导出数据库：' + row.name.toLowerCase() + '\n\n' +
+          '导出过程会把整个数据库读入内存并打包为 ZIP，' +
+          '较大的库可能会让页面短暂无响应。\n\n' +
+          '请确保当前没有其他标签页正在写入该数据库。';
+        exportWarnNoShow.checked = false;
+        exportWarnDialog.open = true;
+      });
+      actions.appendChild(expBtn);
+      var renameBtn = document.createElement('mdui-button');
+      renameBtn.setAttribute('variant', 'text');
+      renameBtn.textContent = '重命名';
+      renameBtn.addEventListener('click', function() {
+        currentDb = row.name;
+        pendingRenameOld = row.name;
+        if (lsGet(LS_RENAME_WARN)) { openRenameDialog(); return; }
+        renameWarnText.textContent =
+          '即将重命名数据库：' + row.name.toLowerCase() + '\n\n' +
+          'IndexedDB 没有原生的重命名接口，本工具的实际做法是：\n' +
+          '1. 把旧库的全部内容读取到内存\n' +
+          '2. 用新名字创建一个新库，写入全部数据\n' +
+          '3. 删除旧库\n\n' +
+          '这意味着：\n' +
+          '· 大库会占用两倍存储空间，中途可能因配额不足而失败\n' +
+          '· 如果第 3 步失败，会留下一个孤儿新库和一个没删掉的旧库\n' +
+          '· 中途关闭页面会导致数据落在新库但旧库未删\n\n' +
+          '建议先导出备份再进行重命名。';
+        renameWarnNoShow.checked = false;
+        renameWarnDialog.open = true;
+      });
+      actions.appendChild(renameBtn);
+      var delBtn = document.createElement('mdui-button');
+      delBtn.setAttribute('variant', 'text');
+      delBtn.textContent = '删除';
+      delBtn.style.color = 'rgb(var(--mdui-color-error))';
+      delBtn.addEventListener('click', function() { confirmDelete(row.name); });
+      actions.appendChild(delBtn);
+      item.appendChild(actions);
+      dbListContainer.appendChild(item);
+    });
+  }
+  function updateSelectionUI() {
+    var n = selected.size;
+    selectedCount.textContent = n > 0 ? '已选 ' + n + ' 个' : '';
+    btnBatchDelete.disabled = n === 0;
+    btnBatchExport.disabled = n === 0;
+  }
+  btnSelectAll.addEventListener('click', function() {
+    allDbs.forEach(function(r) { selected.add(r.name); });
+    refreshCheckboxStates();
+    updateSelectionUI();
+  });
+  btnSelectNone.addEventListener('click', function() {
+    selected.clear();
+    refreshCheckboxStates();
+    updateSelectionUI();
+  });
+  function refreshCheckboxStates() {
+    var checkboxes = dbListContainer.querySelectorAll('mdui-checkbox');
+    var i = 0;
+    allDbs.forEach(function(r) {
+      if (checkboxes[i]) checkboxes[i].checked = selected.has(r.name);
+      i++;
+    });
+  }
+  function showDetail(name) {
+    currentDb = name;
+    inspectName.textContent = name.toLowerCase();
+    storeSummary.innerHTML = '';
+    detailProgress.textContent = '';
+    inspectCard.style.display = 'block';
+    log('查看详情：' + name.toLowerCase(), 'info');
+    showLoading('正在读取数据库结构...');
+    openExistingDB(name).then(function(db) {
+      var stores = Array.from(db.objectStoreNames);
+      var total = 0;
+      var html = '';
+      return Promise.all(stores.map(function(s) {
+        return getAllKeys(db, s).then(function(keys) {
+          total += keys.length;
+          html += '<div class="summary-item">' +
+            '<span class="store-name">' + esc(s) + '</span>' +
+            '<span class="store-count">' + keys.length + ' 条记录</span>' +
+            '</div>';
+        });
+      })).then(function() {
+        db.close();
+        storeSummary.innerHTML = html +
+          '<div class="summary-item" style="margin-top:8px;font-weight:600;">' +
+          '<span>合计</span><span>' + total + ' 条记录</span></div>';
+        log(name.toLowerCase() + ' 详情：' + stores.length + ' 存储 / ' + total + ' 记录', 'success');
+      });
+    }).catch(function(err) {
+      setStatus('读取详情失败: ' + err.message, 'error');
+      log('读取详情失败：' + err.message, 'error');
+    }).then(function() {
+      hideLoading();
+    });
+  }
+  btnExport.addEventListener('click', function() {
+    if (!currentDb) { toast('请先选择一个数据库'); return; }
+    pendingExportName = currentDb;
+    if (lsGet(LS_EXPORT_WARN)) {
+      checkEnvironment().then(function(ok) {
+        if (ok) doExport(currentDb);
+      });
+      return;
+    }
+    exportWarnText.textContent =
+      '即将导出数据库：' + currentDb.toLowerCase() + '\n\n' +
+      '导出过程会把整个数据库读入内存并打包为 ZIP，' +
+      '较大的库可能会让页面短暂无响应。\n\n' +
+      '请确保当前没有其他标签页正在写入该数据库。';
+    exportWarnNoShow.checked = false;
+    exportWarnDialog.open = true;
+  });
+  exportWarnCancel.addEventListener('click', function() {
+    exportWarnDialog.open = false;
+    pendingExportName = null;
+  });
+  exportWarnOk.addEventListener('click', function() {
+    if (exportWarnNoShow.checked) lsSet(LS_EXPORT_WARN);
+    exportWarnDialog.open = false;
+    var name = pendingExportName || currentDb;
+    pendingExportName = null;
+    if (!name) return;
+    checkEnvironment().then(function(ok) {
+      if (ok) doExport(name);
+    });
+  });
+  function doExport(name) {
+    showLoading('正在读取 ' + name.toLowerCase() + '...');
+    detailProgress.textContent = '';
+    log('开始导出：' + name.toLowerCase(), 'info');
+    exportDatabaseToBlob(name).then(function(blob) {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = name.replace(/[^a-zA-Z0-9_-]/g, '_') + '_backup.zip';
+      a.click();
+      URL.revokeObjectURL(url);
+      hideLoading();
+      setStatus('导出成功：' + name, 'success');
+      log('导出成功：' + name.toLowerCase() + '（' + formatBytes(blob.size) + '）', 'success');
+      toast('导出成功');
+    }).catch(function(err) {
+      hideLoading();
+      setStatus('导出失败: ' + err.message, 'error');
+      log('导出失败：' + err.message, 'error');
+    });
+  }
+  function exportDatabaseToBlob(name) {
+    var zip = new JSZip();
+    var metadata = {
+      format: 'eaglercraft-indexeddb-backup',
+      version: 1,
+      dbName: name,
+      exportedAt: new Date().toISOString(),
+      stores: []
+    };
+    return openExistingDB(name).then(function(db) {
+      var stores = Array.from(db.objectStoreNames);
+      return Promise.all(stores.map(function(storeName) {
+        return Promise.all([getAllKeys(db, storeName), getAllValues(db, storeName)])
+        .then(function(res) {
+          var keys = res[0], values = res[1];
+          var info = { name: storeName, keyPath: null, autoIncrement: false, records: [] };
+          try {
+            var tx = db.transaction(storeName, 'readonly');
+            var os = tx.objectStore(storeName);
+            info.keyPath = os.keyPath;
+            info.autoIncrement = os.autoIncrement;
+          } catch (e) {}
+          var folder = zip.folder(encodeURIComponent(storeName));
+          var pending = [];
+          values.forEach(function(value, i) {
+            var key = keys[i];
+            var idx = String(i).padStart(5, '0');
+            var keyInfo = serializeKey(key);
+            var valueEntry = null;
+            if (value instanceof ArrayBuffer) {
+              folder.file(idx + '.bin', new Uint8Array(value));
+              valueEntry = { type: 'arraybuffer', file: idx + '.bin' };
+            } else if (ArrayBuffer.isView(value)) {
+              folder.file(idx + '.bin', new Uint8Array(value.buffer, value.byteOffset, value.byteLength));
+              valueEntry = { type: 'typedarray', ctor: value.constructor.name, file: idx + '.bin' };
+            } else if (value instanceof Blob) {
+              valueEntry = { type: 'blob', file: idx + '.bin' };
+              pending.push(value.arrayBuffer().then(function(ab) {
+                folder.file(idx + '.bin', new Uint8Array(ab));
+              }));
+            } else if (value === undefined) {
+              valueEntry = { type: 'undefined' };
+            } else {
+              try {
+                folder.file(idx + '.json', JSON.stringify(value));
+                valueEntry = { type: 'json', file: idx + '.json' };
+              } catch (e) {
+                valueEntry = { type: 'string', value: String(value) };
+              }
+            }
+            info.records.push({ key: keyInfo, value: valueEntry });
+          });
+          return Promise.all(pending).then(function() {
+            metadata.stores.push(info);
+          });
+        });
+      })).then(function() { db.close(); });
+    }).then(function() {
+      zip.file('_metadata.json', JSON.stringify(metadata, null, 2));
+      return zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+    });
+  }
+  function serializeKey(key) {
+    if (key === undefined) return { type: 'undefined' };
+    if (key === null) return { type: 'null' };
+    if (key instanceof Date) return { type: 'date', value: key.getTime() };
+    if (Array.isArray(key)) return { type: 'array', value: key.map(serializeKey) };
+    if (ArrayBuffer.isView(key)) return { type: 'typedarray', ctor: key.constructor.name, value: Array.from(key) };
+    var t = typeof key;
+    if (t === 'number' || t === 'string' || t === 'boolean') return { type: t, value: key };
+    return { type: 'json', value: JSON.stringify(key) };
+  }
+  function deserializeKey(info) {
+    if (!info) return undefined;
+    switch (info.type) {
+      case 'undefined': return undefined;
+      case 'null': return null;
+      case 'date': return new Date(info.value);
+      case 'array': return info.value.map(deserializeKey);
+      case 'number': case 'string': case 'boolean': return info.value;
+      case 'typedarray':
+        if (info.ctor === 'Uint8Array') return new Uint8Array(info.value);
+        return info.value;
+      case 'json': return JSON.parse(info.value);
+      default: return undefined;
+    }
+  }
+  btnImportTriggerTop.addEventListener('click', function() { fileInput.click(); });
+  btnImportTrigger.addEventListener('click', function() { fileInput.click(); });
+  fileInput.addEventListener('change', function(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    fileInput.value = '';
+    showLoading('正在读取 ZIP 元数据...');
+    readZipMetadata(file).then(function(ctx) {
+      hideLoading();
+      pendingImportZip = ctx.zip;
+      pendingImportMeta = ctx.meta;
+      importInfoText.textContent =
+        '备份来源：' + file.name + '\n' +
+        '原数据库名：' + ctx.meta.dbName + '\n' +
+        '对象存储数：' + ctx.meta.stores.length + '\n' +
+        '导出时间：' + (ctx.meta.exportedAt || '未知');
+      importTargetInput.value = ctx.meta.dbName;
+      importClearExisting.checked = true;
+      importTargetDialog.open = true;
+    }).catch(function(err) {
+      hideLoading();
+      setStatus('读取 ZIP 失败: ' + err.message, 'error');
+      log('读取 ZIP 失败：' + err.message, 'error');
+    });
+  });
+  function readZipMetadata(file) {
+    return new Promise(function(resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        var zip = new JSZip();
+        zip.loadAsync(ev.target.result).then(function(z) {
+          var metaFile = z.file('_metadata.json');
+          if (!metaFile) throw new Error('缺少 _metadata.json，可能不是本工具导出的备份');
+          return metaFile.async('string').then(function(s) {
+            var meta = JSON.parse(s);
+            if (meta.format !== 'eaglercraft-indexeddb-backup') throw new Error('备份格式不匹配');
+            resolve({ zip: z, meta: meta });
+          });
+        }).catch(reject);
+      };
+      reader.onerror = function() { reject(reader.error); };
+      reader.readAsArrayBuffer(file);
+    });
+  }
+  importTargetCancel.addEventListener('click', function() {
+    importTargetDialog.open = false;
+    pendingImportZip = null;
+    pendingImportMeta = null;
+  });
+  importTargetOk.addEventListener('click', function() {
+    var targetName = (importTargetInput.value || '').trim();
+    if (!targetName) { toast('目标库名不能为空'); return; }
+    var clearExisting = importClearExisting.checked;
+    var zip = pendingImportZip;
+    var meta = pendingImportMeta;
+    importTargetDialog.open = false;
+    pendingImportZip = null;
+    pendingImportMeta = null;
+    checkEnvironment().then(function(ok) {
+      if (!ok) return;
+      doImportFromZip(zip, meta, targetName, clearExisting).then(function() {
+        setStatus('导入完成！目标库：' + targetName.toLowerCase(), 'success');
+        log('导入成功：' + targetName, 'success');
+        toast('导入完成');
+        refreshList();
+      }).catch(function(err) {
+        setStatus('导入失败: ' + err.message, 'error');
+        log('导入失败：' + err.message, 'error');
+      });
+    });
+  });
+  function doImportFromZip(zip, meta, targetName, clearExisting) {
+    showLoading('正在导入到 ' + targetName.toLowerCase() + '...');
+    detailProgress.textContent = '';
+    log('开始导入到：' + targetName + (clearExisting ? '（清空现有数据）' : '（保留现有数据，覆盖同名 key）'), 'info');
+    return listDatabases().then(function(names) {
+      if (names === null) {
+        log('无法检测目标库是否已存在（indexedDB.databases 不可用），将尝试直接打开', 'warn');
+      } else if (names.indexOf(targetName) === -1) {
+        log('目标库不存在，将创建新库：' + targetName, 'info');
+      } else {
+        log('目标库已存在：' + targetName, 'info');
+      }
+      return openOrCreateDB(targetName, meta.stores.map(function(s) {
+        return {
+          name: s.name,
+          keyPath: s.keyPath || undefined,
+          autoIncrement: !!s.autoIncrement
+        };
+      }));
+    }).then(function(r) {
+      if (r.created) log('新库已创建，包含 ' + meta.stores.length + ' 个对象存储', 'info');
+      return preloadBackupData(zip, meta).then(function(preloaded) {
+        return writePreloadedToDB(r.db, meta, preloaded, clearExisting);
+      }).then(function() {
+        r.db.close();
+      }, function(err) {
+        try { r.db.close(); } catch (e) {}
+        throw err;
+      });
+    }).then(function() {
+      hideLoading();
+    }, function(err) {
+      hideLoading();
+      throw err;
+    });
+  }
+  function preloadBackupData(zip, meta) {
+    loadingText.textContent = '正在解压备份数据...';
+    var result = {};
+    var allStores = meta.stores;
+    var storeIdx = 0;
+    function loadStore() {
+      if (storeIdx >= allStores.length) return Promise.resolve();
+      var storeInfo = allStores[storeIdx];
+      var folder = encodeURIComponent(storeInfo.name);
+      var records = storeInfo.records;
+      var out = new Array(records.length);
+      var i = 0;
+      function loadRecord() {
+        if (i >= records.length) {
+          result[storeInfo.name] = out;
+          storeIdx++;
+          loadingText.textContent = '正在解压 (' + storeIdx + '/' + allStores.length + ')：' + storeInfo.name;
+          return loadStore();
+        }
+        var rec = records[i];
+        var v = rec.value;
+        var key = rec.key;
+        var p;
+        if (v.type === 'arraybuffer' || v.type === 'blob') {
+          p = zip.file(folder + '/' + v.file).async('arraybuffer').then(function(buf) {
+            out[i] = { key: key, value: v.type === 'blob' ? new Blob([buf]) : buf, valueType: v.type };
+          });
+        } else if (v.type === 'typedarray') {
+          p = zip.file(folder + '/' + v.file).async('arraybuffer').then(function(buf) {
+            var u8 = new Uint8Array(buf);
+            out[i] = { key: key, value: v.ctor === 'Uint8Array' ? u8 : buf, valueType: 'typedarray' };
+          });
+        } else if (v.type === 'json') {
+          p = zip.file(folder + '/' + v.file).async('string').then(function(s) {
+            out[i] = { key: key, value: JSON.parse(s), valueType: 'json' };
+          });
+        } else if (v.type === 'string') {
+          out[i] = { key: key, value: v.value, valueType: 'string' };
+          p = Promise.resolve();
+        } else if (v.type === 'undefined') {
+          out[i] = { key: key, value: undefined, valueType: 'undefined' };
+          p = Promise.resolve();
+        } else {
+          out[i] = { key: key, value: undefined, valueType: 'unknown' };
+          p = Promise.resolve();
+        }
+        return p.then(function() { i++; return loadRecord(); });
+      }
+      return loadRecord();
+    }
+    return loadStore().then(function() { return result; });
+  }
+  function writePreloadedToDB(db, meta, preloaded, clearExisting) {
+    var total = meta.stores.length;
+    var done = 0;
+    var chain = Promise.resolve();
+    meta.stores.forEach(function(storeInfo) {
+      chain = chain.then(function() {
+        if (!db.objectStoreNames.contains(storeInfo.name)) {
+          log('跳过不存在的存储：' + storeInfo.name, 'warn');
+          done++;
+          return;
+        }
+        var records = preloaded[storeInfo.name] || [];
+        return writeOneStore(db, storeInfo, records, clearExisting).then(function(count) {
+          done++;
+          loadingText.textContent = '正在写入 (' + done + '/' + total + ')：' + storeInfo.name;
+          detailProgress.textContent = '正在写入 ' + done + '/' + total + ' 个存储...';
+          log('已写入 ' + storeInfo.name + '：' + count + ' 条记录', 'info');
+        });
+      });
+    });
+    return chain;
+  }
+  function writeOneStore(db, storeInfo, records, clearExisting) {
+    return new Promise(function(resolve, reject) {
+      var tx = db.transaction(storeInfo.name, 'readwrite');
+      var store = tx.objectStore(storeInfo.name);
+      var isInlineKey = !!storeInfo.keyPath;
+      tx.oncomplete = function() { resolve(records.length); };
+      tx.onerror = function(e) { reject(tx.error || (e.target && e.target.error) || new Error('事务失败')); };
+      tx.onabort = function(e) { reject(tx.error || new Error('事务被中止')); };
+      try {
+        if (clearExisting) store.clear();
+        records.forEach(function(rec) {
+          var key = deserializeKey(rec.key);
+          var val = rec.value;
+          if (isInlineKey) store.put(val);
+          else store.put(val, key);
+        });
+      } catch (err) {
+        try { tx.abort(); } catch (e) {}
+        reject(err);
+      }
+    });
+  }
+  function restoreFromBackup(zip, meta, opts) {
+    opts = opts || {};
+    var targetName = opts.targetName || meta.dbName;
+    if (!targetName) throw new Error('未指定目标数据库名称');
+    return openOrCreateDB(targetName, meta.stores.map(function(s) {
+      return {
+        name: s.name,
+        keyPath: s.keyPath || undefined,
+        autoIncrement: !!s.autoIncrement
+      };
+    })).then(function(r) {
+      return preloadBackupData(zip, meta).then(function(preloaded) {
+        return writePreloadedToDB(r.db, meta, preloaded, false);
+      }).then(function() {
+        r.db.close();
+      }, function(err) {
+        try { r.db.close(); } catch (e) {}
+        throw err;
+      });
+    });
+  }
+  function confirmDelete(name) {
+    pendingDeleteName = name;
+    deleteConfirmText.textContent =
+      '即将删除数据库：' + name.toLowerCase() + '\n\n' +
+      '此操作不可恢复，建议先导出备份。确认删除？';
+    deleteConfirmDialog.open = true;
+  }
+  deleteConfirmCancel.addEventListener('click', function() {
+    deleteConfirmDialog.open = false;
+    pendingDeleteName = null;
+  });
+  deleteConfirmOk.addEventListener('click', function() {
+    deleteConfirmDialog.open = false;
+    var name = pendingDeleteName;
+    pendingDeleteName = null;
+    if (name) doDelete(name);
+  });
+  function doDelete(name) {
+    showLoading('正在删除 ' + name.toLowerCase() + '...');
+    log('开始删除：' + name.toLowerCase(), 'info');
+    deleteDatabase(name).then(function() {
+      setStatus('已删除：' + name.toLowerCase(), 'success');
+      log('删除成功：' + name.toLowerCase(), 'success');
+      toast('已删除');
+      refreshList();
+    }).catch(function(err) {
+      setStatus('删除失败: ' + err.message, 'error');
+      log('删除失败：' + err.message, 'error');
+    }).then(function() {
+      hideLoading();
+    });
+  }
+  renameWarnCancel.addEventListener('click', function() {
+    renameWarnDialog.open = false;
+    pendingRenameOld = null;
+  });
+  renameWarnOk.addEventListener('click', function() {
+    if (renameWarnNoShow.checked) lsSet(LS_RENAME_WARN);
+    renameWarnDialog.open = false;
+    checkEnvironment().then(function(ok) {
+      if (ok) openRenameDialog();
+    });
+  });
+  function openRenameDialog() {
+    renameInput.value = pendingRenameOld ? pendingRenameOld.toLowerCase() : '';
+    renameDialog.open = true;
+    setTimeout(function() {
+      try { renameInput.focus(); } catch (e) {}
+    }, 200);
+  }
+  renameCancel.addEventListener('click', function() {
+    renameDialog.open = false;
+    pendingRenameOld = null;
+  });
+  renameConfirm.addEventListener('click', function() {
+    if (!pendingRenameOld) { renameDialog.open = false; return; }
+    var oldName = pendingRenameOld;
+    var newName = (renameInput.value || '').trim();
+    if (!newName) { toast('名称不能为空'); return; }
+    if (newName === oldName) { toast('名称未改变'); return; }
+    renameDialog.open = false;
+    pendingRenameOld = null;
+    doRename(oldName, newName);
+  });
+  function doRename(oldName, newName) {
+    showLoading('正在准备重命名...');
+    detailProgress.textContent = '步骤 1/3：读取旧库数据';
+    log('开始重命名：' + oldName.toLowerCase() + ' → ' + newName.toLowerCase(), 'info');
+    listDatabases().then(function(names) {
+      if (names && names.indexOf(newName) !== -1) {
+        throw new Error('目标名称已存在：' + newName);
+      }
+      return buildBackupObject(oldName);
+    }).then(function(backup) {
+      detailProgress.textContent = '步骤 2/3：写入新库 ' + newName.toLowerCase();
+      log('步骤 1/3 完成，开始写入新库', 'info');
+      return restoreFromBackup(backup.zip, backup.meta, { targetName: newName });
+    }).then(function() {
+      detailProgress.textContent = '步骤 3/3：删除旧库 ' + oldName.toLowerCase();
+      log('步骤 2/3 完成，开始删除旧库', 'info');
+      return deleteDatabase(oldName);
+    }).then(function() {
+      setStatus('重命名成功：' + oldName.toLowerCase() + ' → ' + newName.toLowerCase(), 'success');
+      log('重命名成功：' + oldName.toLowerCase() + ' → ' + newName.toLowerCase(), 'success');
+      toast('重命名成功');
+      currentDb = newName;
+      refreshList();
+    }).catch(function(err) {
+      setStatus('重命名失败: ' + err.message, 'error');
+      log('重命名失败：' + err.message, 'error');
+    }).then(function() {
+      hideLoading();
+    });
+  }
+  function buildBackupObject(name) {
+    var zip = new JSZip();
+    var metadata = {
+      format: 'eaglercraft-indexeddb-backup',
+      version: 1,
+      dbName: name,
+      exportedAt: new Date().toISOString(),
+      stores: []
+    };
+    return openExistingDB(name).then(function(db) {
+      var stores = Array.from(db.objectStoreNames);
+      return Promise.all(stores.map(function(storeName) {
+        return Promise.all([getAllKeys(db, storeName), getAllValues(db, storeName)])
+        .then(function(res) {
+          var keys = res[0], values = res[1];
+          var info = { name: storeName, keyPath: null, autoIncrement: false, records: [] };
+          try {
+            var tx = db.transaction(storeName, 'readonly');
+            var os = tx.objectStore(storeName);
+            info.keyPath = os.keyPath;
+            info.autoIncrement = os.autoIncrement;
+          } catch (e) {}
+          var folder = zip.folder(encodeURIComponent(storeName));
+          var pending = [];
+          values.forEach(function(value, i) {
+            var key = keys[i];
+            var idx = String(i).padStart(5, '0');
+            var keyInfo = serializeKey(key);
+            var valueEntry = null;
+            if (value instanceof ArrayBuffer) {
+              folder.file(idx + '.bin', new Uint8Array(value));
+              valueEntry = { type: 'arraybuffer', file: idx + '.bin' };
+            } else if (ArrayBuffer.isView(value)) {
+              folder.file(idx + '.bin', new Uint8Array(value.buffer, value.byteOffset, value.byteLength));
+              valueEntry = { type: 'typedarray', ctor: value.constructor.name, file: idx + '.bin' };
+            } else if (value instanceof Blob) {
+              valueEntry = { type: 'blob', file: idx + '.bin' };
+              pending.push(value.arrayBuffer().then(function(ab) {
+                folder.file(idx + '.bin', new Uint8Array(ab));
+              }));
+            } else if (value === undefined) {
+              valueEntry = { type: 'undefined' };
+            } else {
+              try {
+                folder.file(idx + '.json', JSON.stringify(value));
+                valueEntry = { type: 'json', file: idx + '.json' };
+              } catch (e) {
+                valueEntry = { type: 'string', value: String(value) };
+              }
+            }
+            info.records.push({ key: keyInfo, value: valueEntry });
+          });
+          return Promise.all(pending).then(function() {
+            metadata.stores.push(info);
+          });
+        });
+      })).then(function() { db.close(); });
+    }).then(function() {
+      return { zip: zip, meta: metadata };
+    });
+  }
+  btnBatchDelete.addEventListener('click', function() {
+    if (selected.size === 0) return;
+    var names = Array.from(selected);
+    if (lsGet(LS_BATCH_DELETE_WARN)) {
+      checkEnvironment().then(function(ok) { if (ok) doBatchDelete(names); });
+      return;
+    }
+    batchDeleteWarnText.textContent =
+      '即将删除以下 ' + names.length + ' 个数据库：\n\n' +
+      names.map(function(n) { return '· ' + n.toLowerCase(); }).join('\n') +
+      '\n\n此操作不可恢复，建议先批量导出备份。';
+    batchDeleteWarnNoShow.checked = false;
+    batchDeleteWarnDialog.open = true;
+  });
+  batchDeleteWarnCancel.addEventListener('click', function() { batchDeleteWarnDialog.open = false; });
+  batchDeleteWarnOk.addEventListener('click', function() {
+    if (batchDeleteWarnNoShow.checked) lsSet(LS_BATCH_DELETE_WARN);
+    batchDeleteWarnDialog.open = false;
+    checkEnvironment().then(function(ok) {
+      if (ok) doBatchDelete(Array.from(selected));
+    });
+  });
+  function doBatchDelete(names) {
+    showLoading('正在批量删除...');
+    log('开始批量删除，共 ' + names.length + ' 个', 'info');
+    var done = 0;
+    var chain = Promise.resolve();
+    names.forEach(function(name) {
+      chain = chain.then(function() {
+        loadingText.textContent = '正在删除 (' + (done + 1) + '/' + names.length + ')：' + name.toLowerCase();
+        return deleteDatabase(name).then(function() {
+          done++;
+          log('已删除：' + name.toLowerCase(), 'info');
+        }).catch(function(err) {
+          console.warn('删除 ' + name + ' 失败：' + err.message);
+          log('删除失败：' + name.toLowerCase() + ' - ' + err.message, 'error');
+        });
+      });
+    });
+    chain.then(function() {
+      setStatus('批量删除完成，成功 ' + done + '/' + names.length + ' 个。', 'success');
+      log('批量删除完成，成功 ' + done + '/' + names.length + ' 个', 'success');
+      toast('批量删除完成');
+      selected.clear();
+      refreshList();
+    }).then(function() {
+      hideLoading();
+    });
+  }
+  btnBatchExport.addEventListener('click', function() {
+    if (selected.size === 0) return;
+    var names = Array.from(selected);
+    if (lsGet(LS_BATCH_EXPORT_WARN)) {
+      checkEnvironment().then(function(ok) { if (ok) doBatchExport(names); });
+      return;
+    }
+    batchExportWarnText.textContent =
+      '即将导出以下 ' + names.length + ' 个数据库：\n\n' +
+      names.map(function(n) { return '· ' + n.toLowerCase(); }).join('\n') +
+      '\n\n每个库会先单独打包为一个 ZIP，所有 ZIP 再合并到一个外层 ZIP 中下载。\n' +
+      '整个过程数据都会驻留内存，库很多或很大时页面可能短暂无响应。';
+    batchExportWarnNoShow.checked = false;
+    batchExportWarnDialog.open = true;
+  });
+  batchExportWarnCancel.addEventListener('click', function() { batchExportWarnDialog.open = false; });
+  batchExportWarnOk.addEventListener('click', function() {
+    if (batchExportWarnNoShow.checked) lsSet(LS_BATCH_EXPORT_WARN);
+    batchExportWarnDialog.open = false;
+    checkEnvironment().then(function(ok) {
+      if (ok) doBatchExport(Array.from(selected));
+    });
+  });
+  function doBatchExport(names) {
+    showLoading('正在批量导出...');
+    log('开始批量导出，共 ' + names.length + ' 个', 'info');
+    var outerZip = new JSZip();
+    var done = 0;
+    var chain = Promise.resolve();
+    names.forEach(function(name) {
+      chain = chain.then(function() {
+        loadingText.textContent = '正在导出 (' + (done + 1) + '/' + names.length + ')：' + name.toLowerCase();
+        return exportDatabaseToBlob(name).then(function(blob) {
+          outerZip.file(name.replace(/[^a-zA-Z0-9_-]/g, '_') + '_backup.zip', blob);
+          done++;
+          log('已导出：' + name.toLowerCase() + '（' + formatBytes(blob.size) + '）', 'info');
+        }).catch(function(err) {
+          console.warn('导出 ' + name + ' 失败：' + err.message);
+          log('导出失败：' + name.toLowerCase() + ' - ' + err.message, 'error');
+          outerZip.file(name.replace(/[^a-zA-Z0-9_-]/g, '_') + '_FAILED.txt',
+                        '导出失败：' + err.message);
+        });
+      });
+    });
+    chain.then(function() {
+      loadingText.textContent = '正在生成外层 ZIP...';
+      return outerZip.generateAsync({ type: 'blob', compression: 'STORE' });
+    }).then(function(blob) {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'eaglercraft_batch_export_' + Date.now() + '.zip';
+      a.click();
+      URL.revokeObjectURL(url);
+      setStatus('批量导出完成，共 ' + done + '/' + names.length + ' 个库。', 'success');
+      log('批量导出完成，共 ' + done + '/' + names.length + ' 个库', 'success');
+      toast('批量导出完成');
+    }).catch(function(err) {
+      setStatus('批量导出失败: ' + err.message, 'error');
+      log('批量导出失败：' + err.message, 'error');
+    }).then(function() {
+      hideLoading();
+    });
+  }
+  btnResetWarnings.addEventListener('click', function() {
+    var keys = [LS_RENAME_WARN, LS_EXPORT_WARN, LS_BATCH_EXPORT_WARN, LS_BATCH_DELETE_WARN];
+    var cleared = 0;
+    keys.forEach(function(k) {
+      try {
+        if (localStorage.getItem(k) !== null) {
+          localStorage.removeItem(k);
+          cleared++;
+        }
+      } catch (e) {}
+    });
+    log('重置警告提示，清除 ' + cleared + ' 项设置', 'info');
+    toast(cleared > 0 ? '已恢复 ' + cleared + ' 项警告' : '所有警告本来就是开启状态');
+    setStatus('警告提示已重置，下次执行重命名、导出、批量操作时会再次弹出提醒。', 'success');
+  });
+  btnCopyLog.addEventListener('click', function() {
+    var text = logLines.map(function(l) { return l.text; }).join('\n');
+    if (!text) { toast('日志为空'); return; }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function() {
+        toast('日志已复制');
+        log('日志已复制到剪贴板', 'success');
+      }).catch(function() {
+        toast('复制失败，请手动选择');
+      });
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); toast('日志已复制'); }
+      catch (e) { toast('复制失败'); }
+      document.body.removeChild(ta);
+    }
+  });
+  btnExportLog.addEventListener('click', function() {
+    var text = logLines.map(function(l) { return l.text; }).join('\n');
+    if (!text) { toast('日志为空'); return; }
+    var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'idb_backup_log_' + Date.now() + '.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+    log('日志已导出', 'success');
+  });
+  btnClearLog.addEventListener('click', function() {
+    logLines = [];
+    renderLog();
+    logCard.style.display = 'none';
+  });
+  checkEnvironment().then(function(ok) {
+    if (ok) refreshList();
+  });
+})();
+</script>
+</body>
+</html>
